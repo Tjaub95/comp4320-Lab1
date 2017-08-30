@@ -1,6 +1,5 @@
 #!/usr/bin/python
 
-VOWELS = ["A","E","I","O","U","a","e","i","o","u"]
 
 OUTPUT_STRING = """Response:
         Size:       {0} bytes
@@ -21,8 +20,8 @@ class UDPClient:
         self.port = port
         self.sock = socket(AF_INET, SOCK_DGRAM)
 
-    def vowel_len(self, message):
-        self.send_message(85, message)
+    def cons_len(self, message):
+        self.send_message(5, message)
 
         resp, addr = self.sock.recvfrom(2**12)
         rtml, rrid, rans = struct.unpack('!HHH',resp[:6])
@@ -56,10 +55,10 @@ if __name__ == '__main__':
     port = int(port)
     operation = int(operation)
     client = UDPClient(host, port)
-    if operation == 85:
+    if operation == 5:
         start = time.time()
-        print "How many vowels are in \"{}\"?".format(message)
-        result = client.vowel_len(message)
+        print "How many consonants are in \"{}\"?".format(message)
+        result = client.cons_len(message)
         print OUTPUT_STRING.format(result[0], result[1], result[2])
         print "\tRound Trip Time: {}s".format(time.time()-start)
     elif operation == 170:

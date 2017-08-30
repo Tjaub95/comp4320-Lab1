@@ -14,9 +14,11 @@
 
 #define BUF_SIZE 1024
 
+const char *con_len_code = "5";
 const char *vowel_len_code = "85";
-const char *disemvowel_code = "170";
+const char *upper_len_code = "10";
 const char *vowels = "aeiouAEIOU";
+const char *consonants = "bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ";
 int count;
 
 int main(int argc, char* argv[]) {
@@ -66,23 +68,21 @@ int main(int argc, char* argv[]) {
      q++;
    }
 
-      if (operation == 85)
+      if (operation == 5) //consonant check
        {   
           count = 0;
           int i = 0;
           n = 6;
           messageLength = 6;
-          while(string[i] != '\0') 
-          {
-                if(string[i] == 'a' || string[i] == 'e'
-                   || string[i] == 'i' || string[i] == 'o' || string[i] =='u'
-                   || string [i] == 'A' || string[i] == 'E' || string[i] =='I'
-                   || string [i] == 'O' || string[i] == 'U') 
+	  char *con_string = strstr(string, consonant);
+                if(con_string != NULL) 
                 {
-                count++;
+                count = strlen(con_string);
                 }
-                i++;
-          }   
+		else {
+			count = 0;
+		} 
+		  
           unsigned char countChar = (char)count;
           buf[5] = ((unsigned char)count);
           buf[4] = (unsigned char)(count >> 8);
