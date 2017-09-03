@@ -25,7 +25,7 @@ struct __attribute__((__packed__)) Message {
 struct __attribute__((__packed__)) Response1 {
 	short len;
 	short id;
-	short answer;
+	unsigned char answer;
 } lenMessage;
 
 struct __attribute__((__packed__)) Response2 {
@@ -137,10 +137,10 @@ int main(int argc, char *argv[])
 			}
 
 			lenMessage.id = request;
-			lenMessage.answer = count;
+			lenMessage.answer = (unsigned char) count;
 			lenMessage.len = 6;
 
-			if ((numbytes = sendto(sockfd, &lenMessage, lenMessage.len, 0,
+			if ((numbytes = sendto(sockfd, (char*)&lenMessage, lenMessage.len, 0,
 				 (struct sockaddr *)&their_addr, addr_len)) == -1) {
 			    perror("listener: sendto");
 			    exit(1);
