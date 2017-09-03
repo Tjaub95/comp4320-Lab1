@@ -5,133 +5,190 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <ctype.h>
+#include <netdb.h>
 
-#define BUF_SIZE 1024
+#define MAXBUFLEN 100
 
-const char *con_len_code = "5";
-const char *vowel_len_code = "85";
-const char *upper_len_code = "10";
-const char *vowels = "aeiouAEIOU";
-const char *consonants = "bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ";
-int count;
+struct __attribute__((__packed__)) Message {
+	short len;
+	short id;
+	char op;
+	char message[MAXBUFLEN - 5];
+} recMessage;
 
-int main(int argc, char* argv[]) {
-    unsigned char buf[BUF_SIZE];
-    struct sockaddr_in self, other;
-    int len = sizeof(struct sockaddr_in);
-    int n, s, port;
+struct __attribute__((__packed__)) Response1 {
+	short len;
+	short id;
+	short answer;
+} lenMessage;
 
-    if (argc < 2) {
-    fprintf(stderr, "Usage: %s <port>\n", argv[0]);
-    return 1;
-    }
+struct __attribute__((__packed__)) Response2 {
+	short len;
+	short id;
+	char answer[MAXBUFLEN - 5];
+} removeMessage;
 
-    /* initialize socket */
-    if ((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
-    perror("socket");
-    return 1;
-    }
+// get sockaddr, IPv4 or IPv6:
+void *get_in_addr(struct sockaddr *sa)
+{
+	if (sa->sa_family == AF_INET) {
+		return &(((struct sockaddr_in*)sa)->sin_addr);
+	}
 
-    /* bind to server port */
-    port = atoi(argv[1]);
-    memset((char *) &self, 0, sizeof(struct sockaddr_in));
-    self.sin_family = AF_INET;
-    self.sin_port = htons(port);
-    self.sin_addr.s_addr = htonl(INADDR_ANY);
-    if (bind(s, (struct sockaddr *) &self, sizeof(self)) == -1) {
-    perror("bind");
-    return 1;
-    }
+	return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}
 
-    while ((n = recvfrom(s, buf, BUF_SIZE, 0, (struct sockaddr *) &other, &len)) != -1) 
-    {
-    printf("Received message from client.", 
-        inet_ntoa(other.sin_addr), 
-        ntohs(other.sin_port)); 
-    fflush(stdout);
-     
-  unsigned short messageLength = (buf[0] << 8) + buf[1];
-  unsigned short requestNum = (buf[2] << 8) + buf[3];
-  unsigned char operation = buf[4];
-  unsigned char string[BUF_SIZE];
-  int q = 0;
-  int p;
-  for (p = 5; buf[p] != '\0'; p++)
-   {
-     string[q] = buf[p];
-     q++;
-   }
+int main(int argc, char *argv[])
+{
+	int sockfd;
+	struct addrinfo hints, *servinfo, *p;
+	int rv;
+	int numbytes;
+	short request;
+	struct sockaddr_storage their_addr;
+	char buf[MAXBUFLEN];
+	socklen_t addr_len;
+	char s[INET6_ADDRSTRLEN];
+	char * myPort;
 
-      if (operation == 5) //consonant check
-       {   
-          count = 0;
-          int i = 0;
-          n = 6;
-          messageLength = 6;
-	  char *con_string = strstr(string, consonant);
-                if(con_string != NULL) 
-                {
-                count = strlen(con_string);
-                }
-		else {
-			count = 0;
-		} 
-		  
-          unsigned char countChar = (char)count;
-          buf[5] = ((unsigned char)count);
-          buf[4] = (unsigned char)(count >> 8);
-          buf[1] = ((unsigned char)messageLength);
-          buf[0] = (unsigned char)(messageLength >> 8);
-       }
-       
-       else if (operation == 170)
-       {    
-           // printf("Hey");
-           // fflush(stdout);
-            int k = 0;
-            unsigned char noVow[1024];
-            int j = 5;
-           
-            int cons = 0;
-            while(buf[j] != '\0' && j < messageLength) 
-            {   
-               if(buf[j] == 'a' || buf[j] == 'e' || buf[j] == 'i' || buf[j] == 'o'
-                  || buf[j] == 'u' || buf[j] == 'A' || buf[j] == 'E' || buf[j] =='I'
-                   || buf[j] == 'O' || buf[j] == 'U')
-                {
-                  buf[j-1] = buf[j+1];
-                
-                j++;
-                
+	if (argc != 2) {
+		fprintf(stderr,"usage\n");
+		exit(1);
+	}
 
-                }
-              else  
-              {
-                   buf[j - 1] = buf[j];
-                  j++;
-                  cons++;
-              }
-                
-            }
-            messageLength = cons + 4;
-            buf[4 + cons] = '\0';
-            n =  cons + 4;
-            buf[1] = ((unsigned char)messageLength);
-            buf[0] = (unsigned char)(messageLength >> 8);
-       }
-   
- 
-    /* echo back to client */
-    sendto(s, buf, n, 0, (struct sockaddr *) &other, len);
-    }
-    
-    memset(buf, 0, sizeof buf);
-    close(s);
-    return 0;
+	myPort = argv[1];
+
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC; // set to AF_INET to force IPv4
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = AI_PASSIVE; // use my IP
+
+	if ((rv = getaddrinfo(NULL, myPort, &hints, &servinfo)) != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+		return 1;
+	}
+
+	// loop through all the results and bind to the first we can
+	for(p = servinfo; p != NULL; p = p->ai_next) {
+		if ((sockfd = socket(p->ai_family, p->ai_socktype,
+				p->ai_protocol)) == -1) {
+			perror("listener: socket");
+			continue;
+		}
+
+		if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+			close(sockfd);
+			perror("listener: bind");
+			continue;
+		}
+
+		break;
+	}
+
+	if (p == NULL) {
+		fprintf(stderr, "listener: failed to bind socket\n");
+		return 2;
+	}
+
+	freeaddrinfo(servinfo);
+
+	request = 1;
+	while(1)
+	{
+
+		printf("listener: waiting to recvfrom...\n");
+
+		addr_len = sizeof their_addr;
+		if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
+			(struct sockaddr *)&their_addr, &addr_len)) == -1) {
+			perror("recvfrom");
+			exit(1);
+		}
+
+		buf[numbytes] = '\0';
+
+		recMessage = *((struct Message *)buf);
+
+		if (recMessage.op == (char)5)
+		{
+			short count = 0;
+			int i = 0;
+			while (i < strlen(recMessage.message))
+			{
+				char current = toupper(recMessage.message[i]);
+				switch (current) {
+                    case 'A':
+                    case 'E':
+                    case 'I':
+                    case 'O':
+                    case 'U':
+						break;
+                    default:
+                        count++;
+                        break;
+				}
+				i++;
+			}
+
+			lenMessage.id = request;
+			lenMessage.answer = count;
+			lenMessage.len = 6;
+
+			if ((numbytes = sendto(sockfd, &lenMessage, lenMessage.len, 0,
+				 (struct sockaddr *)&their_addr, addr_len)) == -1) {
+			    perror("listener: sendto");
+			    exit(1);
+			}
+		}
+		else if (recMessage.op == (char)170)
+		{
+			char newArray[strlen(recMessage.message)];
+			short index = 0;
+			int i = 0;
+			while (i < strlen(recMessage.message))
+			{
+				char current = recMessage.message[i];
+				switch (toupper(current)) {
+					case 'A':
+					case 'E':
+					case 'I':
+					case 'O':
+					case 'U':
+						break;
+					default:
+						newArray[index] = current;
+						index++;
+						break;
+				}
+
+				i++;
+			}
+
+			removeMessage.id = request;
+			strcpy(removeMessage.answer, newArray);
+			removeMessage.len = 4 + index;
+
+			if ((numbytes = sendto(sockfd, (char*)&removeMessage, removeMessage.len, 0,
+				 (struct sockaddr *)&their_addr, addr_len)) == -1) {
+			perror("listener: sendto");
+			exit(1);
+			}
+		}
+		else
+		{
+			printf("Invalid Operation\n");
+		}
+
+		request++;
+	}
+
+	close(sockfd);
+
+	return 0;
 }

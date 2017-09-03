@@ -11,6 +11,7 @@ from socket import *
 import struct
 import sys
 import time
+from StringIO import StringIO
 
 class UDPClient:
     req_id = 0
@@ -32,10 +33,9 @@ class UDPClient:
         self.send_message(170, message)
 
         resp, addr = self.sock.recvfrom(2**12)
-        header = resp[:4]
-        rtml, rrid = struct.unpack('!HH', header)
+        rtml, rrid = struct.unpack('!HH', resp[:4])
         # Receive disemvoweled string
-        rans = str(resp[:4])
+        rans = str(resp[4:].strip(" "))
 
         return rtml, rrid, rans
 
@@ -65,6 +65,7 @@ if __name__ == '__main__':
         start = time.time()
         print "Disemvowel the string \"{}\"".format(message)
         result = client.disemvowel(message)
+        print(result)
         print OUTPUT_STRING.format(result[0], result[1], result[2])
         print "\tRound Trip Time: {}s".format(time.time()-start)
     else:
