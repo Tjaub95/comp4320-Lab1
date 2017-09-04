@@ -34,6 +34,12 @@ struct __attribute__((__packed__)) Response2 {
 	char answer[MAXBUFLEN - 5];
 } removeMessage;
 
+struct __attribute__((__packed__)) Response3 {
+	short len;
+	short id;
+	char answer[MAXBUFLEN - 5];
+} upperMessage;
+
 // get sockaddr, IPv4 or IPv6:
 void *get_in_addr(struct sockaddr *sa)
 {
@@ -142,10 +148,35 @@ int main(int argc, char *argv[])
 
 			if ((numbytes = sendto(sockfd, (char*)&lenMessage, lenMessage.len, 0,
 				 (struct sockaddr *)&their_addr, addr_len)) == -1) {
-			    perror("listener: sendto");
+			    perror("listener: sendto\n");
 			    exit(1);
 			}
 		}
+        else if (recMessage.op == (char)10)
+        {
+            char newArray[strlen(recMessage.message)];
+            short index = 0;
+            int i = 0;
+
+            while (i < strlen(recMessage.message))
+            {
+                char current = recMessage.message[i];
+                newArray[index] = toupper(current);
+                index++;
+                i++;
+            }
+
+            upperMessage.id = request;
+            strcpy(upperMessage.answer, newArray);
+            upperMessage.len = 4 + index;
+
+            if ((numbytes = sendto(sockfd, (char*)&upperMessage, upperMessage.len, 0,
+                            (struct sockaddr *)&their_addr, addr_len)) == -1)
+            {
+                perror("listener: sendto\n");
+                exit(1);
+            }
+        }
 		else if (recMessage.op == (char)170)
 		{
 			char newArray[strlen(recMessage.message)];
@@ -176,8 +207,8 @@ int main(int argc, char *argv[])
 
 			if ((numbytes = sendto(sockfd, (char*)&removeMessage, removeMessage.len, 0,
 				 (struct sockaddr *)&their_addr, addr_len)) == -1) {
-			perror("listener: sendto");
-			exit(1);
+			    perror("listener: sendto\n");
+			    exit(1);
 			}
 		}
 		else

@@ -11,7 +11,6 @@ from socket import *
 import struct
 import sys
 import time
-from StringIO import StringIO
 
 class UDPClient:
     req_id = 0
@@ -35,7 +34,17 @@ class UDPClient:
         resp, addr = self.sock.recvfrom(2**12)
         rtml, rrid = struct.unpack('!HH', resp[:4])
         # Receive disemvoweled string
-        rans = str(resp[4:].strip(" "))
+        rans = str(resp[4:])
+
+        return rtml, rrid, rans
+
+    def uppercasing(self, message):
+        self.send_message(10, message)
+
+        resp, addr = self.sock.recvfrom(2**12)
+        rtml, rrid = struct.unpack('!HH', resp[:4])
+        # Receive uppercased string
+        rans = str(resp[4:])
 
         return rtml, rrid, rans
 
@@ -61,11 +70,16 @@ if __name__ == '__main__':
         result = client.cons_len(message)
         print OUTPUT_STRING.format(result[0], result[1], result[2])
         print "\tRound Trip Time: {}s".format(time.time()-start)
+    elif operation == 10:
+        start = time.time()
+        print "Upper case the string \"{}\"".format(message)
+        result = client.uppercasing(message)
+        print OUTPUT_STRING.format(result[0], result[1], result[2])
+        print "\tRound Trip Time: {}s".format(time.time()-start)
     elif operation == 170:
         start = time.time()
         print "Disemvowel the string \"{}\"".format(message)
         result = client.disemvowel(message)
-        print(result)
         print OUTPUT_STRING.format(result[0], result[1], result[2])
         print "\tRound Trip Time: {}s".format(time.time()-start)
     else:
