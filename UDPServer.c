@@ -177,7 +177,7 @@ int main(int argc, char *argv[])
                 exit(1);
             }
         }
-		else if (recMessage.op == (char)170)
+		else if (recMessage.op == (char)80)
 		{
 			char newArray[strlen(recMessage.message)];
 			short index = 0;

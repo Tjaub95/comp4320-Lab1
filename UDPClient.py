@@ -29,7 +29,7 @@ class UDPClient:
         return rtml, rrid, rans
 
     def disemvowel(self, message):
-        self.send_message(170, message)
+        self.send_message(80, message)
 
         resp, addr = self.sock.recvfrom(2**12)
         rtml, rrid = struct.unpack('!HH', resp[:4])
@@ -76,7 +76,7 @@ if __name__ == '__main__':
         result = client.uppercasing(message)
         print OUTPUT_STRING.format(result[0], result[1], result[2])
         print "\tRound Trip Time: {}s".format(time.time()-start)
-    elif operation == 170:
+    elif operation == 80:
         start = time.time()
         print "Disemvowel the string \"{}\"".format(message)
         result = client.disemvowel(message)
