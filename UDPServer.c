@@ -25,7 +25,7 @@ struct __attribute__((__packed__)) Message {
 struct __attribute__((__packed__)) Response1 {
 	short len;
 	short id;
-	unsigned char answer;
+	short answer;
 } lenMessage;
 
 struct __attribute__((__packed__)) Response2 {

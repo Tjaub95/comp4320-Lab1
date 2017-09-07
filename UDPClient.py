@@ -24,7 +24,7 @@ class UDPClient:
         self.send_message(5, message)
 
         resp, addr = self.sock.recvfrom(2**12)
-        rtml, rrid, rans = struct.unpack('!HHH',resp[:6])
+        rtml, rrid, rans = struct.unpack('<HHH',resp[:6])
 
         return rtml, rrid, rans
 
@@ -32,7 +32,7 @@ class UDPClient:
         self.send_message(80, message)
 
         resp, addr = self.sock.recvfrom(2**12)
-        rtml, rrid = struct.unpack('!HH', resp[:4])
+        rtml, rrid = struct.unpack('<HH', resp[:4])
         # Receive disemvoweled string
         rans = str(resp[4:])
 
@@ -42,7 +42,7 @@ class UDPClient:
         self.send_message(10, message)
 
         resp, addr = self.sock.recvfrom(2**12)
-        rtml, rrid = struct.unpack('!HH', resp[:4])
+        rtml, rrid = struct.unpack('<HH', resp[:4])
         # Receive uppercased string
         rans = str(resp[4:])
 
