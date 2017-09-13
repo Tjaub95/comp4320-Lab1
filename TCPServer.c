@@ -191,11 +191,68 @@ int main(int argc, char *argv[])
 
               if (numbytes = send(new_fd, (char*)&lenMessage, lenMessage.len, 0) == -1)
               {
-                  perror("listener: sendto\n");
+                  perror("listener: send\n");
                   exit(1);
               }
 
           }
+          else if (recMessage.op == (char)10)
+          {
+            char newArray[strlen(recMessage.message)];
+            short index = 0;
+            int i = 0;
+
+            while (i < strlen(recMessage.message))
+            {
+                char current = recMessage.message[i];
+                newArray[index] = toupper(current);
+                index++;
+                i++;
+            }
+
+            upperMessage.id = request;
+            strcpy(upperMessage.answer, newArray);
+            upperMessage.len = 4 + index;
+
+            if (numbytes = send(new_fd, (char*)&upperMessage, upperMessage.len, 0) == -1)
+            {
+                perror("listener: send\n");
+                exit(1);
+            }
+          }
+		  else if (recMessage.op == (char)80)
+		  {
+			char newArray[strlen(recMessage.message)];
+			short index = 0;
+			int i = 0;
+			while (i < strlen(recMessage.message))
+			{
+				char current = recMessage.message[i];
+				switch (toupper(current)) {
+					case 'A':
+					case 'E':
+					case 'I':
+					case 'O':
+					case 'U':
+						break;
+					default:
+						newArray[index] = current;
+						index++;
+						break;
+				}
+
+				i++;
+			}
+
+			removeMessage.id = request;
+			strcpy(removeMessage.answer, newArray);
+			removeMessage.len = 4 + index;
+
+			if (numbytes = send(new_fd, (char*)&removeMessage, removeMessage.len, 0) == -1) {
+			    perror("listener: send\n");
+			    exit(1);
+			}
+		  }
           else
           {
              printf("Invalid Operation\n");
