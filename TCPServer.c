@@ -15,20 +15,42 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-#define PORT "10010"  // the port users will be connecting to
 
 #define BACKLOG 10	 // how many pending connections queue will hold
 
+#define MAXDATASIZE 100
+
+struct __attribute__((__packed__)) Message {
+    short len;
+    short id;
+    char op;
+    char message[MAXDATASIZE - 5];
+} recMessage;
+
+struct __attribute__((__packed__)) Response1 {
+    short len;
+    short id;
+    short answer;
+} lenMessage;
+
+struct __attribute__((__packed__)) Response2 {
+    short len;
+    short id;
+    char answer[MAXDATASIZE - 5];
+} removeMessage;
+
+struct __attribute__((__packed__)) Response3 {
+    short len;
+    short id;
+    char answer[MAXDATASIZE - 5];
+} upperMessage;
+
+void displayBuffer(char *Buffer, int length); // _M3
+
 void sigchld_handler(int s)
 {
-	// waitpid() might overwrite errno, so we save and restore it:
-	int saved_errno = errno;
-
 	while(waitpid(-1, NULL, WNOHANG) > 0);
-
-	errno = saved_errno;
 }
-
 
 // get sockaddr, IPv4 or IPv6:
 void *get_in_addr(struct sockaddr *sa)
@@ -40,23 +62,34 @@ void *get_in_addr(struct sockaddr *sa)
 	return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
 	int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
 	struct addrinfo hints, *servinfo, *p;
 	struct sockaddr_storage their_addr; // connector's address information
 	socklen_t sin_size;
+    short request;
 	struct sigaction sa;
 	int yes=1;
+
 	char s[INET6_ADDRSTRLEN];
 	int rv;
+
+	int numbytes;
+	char buf[MAXDATASIZE];
+
+
+	if (argc != 2) {
+		fprintf(stderr,"usage: TCPServerDisplay Port# \n");
+		exit(1);
+	}
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE; // use my IP
 
-	if ((rv = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
+	if ((rv = getaddrinfo(NULL, argv[1] /* _M1 PORT*/, &hints, &servinfo)) != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		return 1;
 	}
@@ -84,12 +117,12 @@ int main(void)
 		break;
 	}
 
-	freeaddrinfo(servinfo); // all done with this structure
-
 	if (p == NULL)  {
 		fprintf(stderr, "server: failed to bind\n");
-		exit(1);
+		return 2;
 	}
+
+	freeaddrinfo(servinfo); // all done with this structure
 
 	if (listen(sockfd, BACKLOG) == -1) {
 		perror("listen");
@@ -106,6 +139,7 @@ int main(void)
 
 	printf("server: waiting for connections...\n");
 
+    request = 1;
 	while(1) {  // main accept() loop
 		sin_size = sizeof their_addr;
 		new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
@@ -119,16 +153,60 @@ int main(void)
 			s, sizeof s);
 		printf("server: got connection from %s\n", s);
 
-		if (!fork()) { // this is the child process
-			close(sockfd); // child doesn't need the listener
-			if (send(new_fd, "Hello, world!", 13, 0) == -1)
-				perror("send");
-			close(new_fd);
-			exit(0);
+		if (!fork()) {
+		  close(sockfd);
+		  if ((numbytes = recv(new_fd, buf, MAXDATASIZE-1, 0)) == -1) {
+		    perror("recv");
+		    exit(1);
+		  }
+
+		  buf[numbytes] = '\0';
+
+          recMessage = *((struct Message *)buf);
+
+          if (recMessage.op == (char)5)
+          {
+              short count = 0;
+              int i = 0;
+              while (i < strlen(recMessage.message))
+              {
+                  char current = toupper(recMessage.message[i]);
+                  switch (current) {
+                      case 'A':
+                      case 'E':
+                      case 'I':
+                      case 'O':
+                      case 'U':
+                          break;
+                      default:
+                          count++;
+                          break;
+                  }
+                  i++;
+              }
+
+              lenMessage.id = request;
+              lenMessage.answer = (unsigned char) count;
+              lenMessage.len = 6;
+
+              if (numbytes = send(new_fd, (char*)&lenMessage, lenMessage.len, 0) == -1)
+              {
+                  perror("listener: sendto\n");
+                  exit(1);
+              }
+
+          }
+          else
+          {
+             printf("Invalid Operation\n");
+          }
+          request++;
+
+		  close(new_fd);
+		  exit(0);
 		}
-		close(new_fd);  // parent doesn't need this
+		close(new_fd);
 	}
 
 	return 0;
 }
-
